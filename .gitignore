@@ -1,0 +1,6 @@
+*.idea
+*__pycache__
+*venv
+
+*datasets
+*saved_models
