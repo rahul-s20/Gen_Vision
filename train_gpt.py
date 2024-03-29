@@ -76,14 +76,14 @@ def estimate_loss():
     model.eval()
     losses = torch.zeros(eval_iters)
     for k in range(eval_iters):
-        X, Y = get_batch(split)
+        X, Y = get_batch()
         logits, loss = model(X, Y)
         losses[k] = loss.item()
     out['train'] = losses.mean()
     model.train()
     return out
 
-if __name__ == "__main__()":
+if __name__ == "__main__":
 
     if init_from == 'scratch':
         # init a new model from scratch
@@ -138,7 +138,7 @@ if __name__ == "__main__()":
     joblib.dump(cto_i, 'saved_models/vocabs/cto_i.joblib')
     joblib.dump(ito_c, 'saved_models/vocabs/ito_c.joblib')
     X, Y = get_batch(encode(cto_i, corpus))
-
+    print("..............")
     for i in max_iters:
         lr = get_lr(i) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:
@@ -157,4 +157,5 @@ if __name__ == "__main__()":
                     'config': config,
                 }
                 print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                torch.save(checkpoint, os.path.join(out_dir, f'{i}_ckpt.pt'))
+        optimizer.step()        
