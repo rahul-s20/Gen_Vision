@@ -16,25 +16,45 @@ decode = lambda d: ''.join([itoc[j] for j in d])
 
 data = torch.tensor(encode(corpus), dtype=torch.long)
 
-context_len = 256 #256
-batch_size = 64
+n = int(0.9*len(data)) # first 90% will be train, rest val
+train_data = data[:n]
+val_data = data[n:]
+
+context_len = 64 #256
+batch_size = 12
 vocab_size = len(uniques)
 epochs = 5000
 learning_rate = 3e-4
+eval_iters = 200
+eval_interval = 500
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 
-def get_batch():
+def get_batch(split):
+    # generate a small batch of data of inputs x and targets y
+    data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - context_len, (batch_size,))
     x = torch.stack([data[i:i+context_len] for i in ix])
     y = torch.stack([data[i+1:i+context_len+1] for i in ix])
     x, y = x.to(device), y.to(device)
     return x, y
 
+@torch.no_grad()
+def estimate_loss():
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split)
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
 
-
-if __name__ == "__main__()":
+if __name__ == "__main__":
 
     model = VisionGPTModel(vocab_size=vocab_size, device=device, block_size=context_len)
     m = model.to(device)
@@ -42,14 +62,16 @@ if __name__ == "__main__()":
     print("starts...............")
     directory = 'saved_models'
     for steps in range(epochs):
-        x_, y_  = get_batch()
+        if steps % eval_interval == 0 or steps == epochs - 1:
+            losses = estimate_loss()
+            print(f"step {steps}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
+        x_, y_  = get_batch('train')
         logits, loss = model(inputs=x_, targets=y_)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        print(f"epochs ==> {steps}")
-        if steps % 100 == 0:
-            print(f"epochs ==> {steps} loss ====> ", loss.item())
+        if steps % eval_interval == 0 or steps == epochs - 1:
             torch.save({
                     'iteration': steps,
                     'model': model.state_dict(),

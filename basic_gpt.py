@@ -102,7 +102,8 @@ class VisionGPTModel(nn.Module):
 
     def forward(self, inputs, targets=None):
         B, T = inputs.shape
-        tok_emb = self.token_embedding_table(inputs) # (B,T,C)
+        input_tensor_clamped = torch.clamp(inputs, 0, self.token_embedding_table.num_embeddings - 1)
+        tok_emb = self.token_embedding_table(input_tensor_clamped) # (B,T,C)
         pos_emb = self.position_embedding_table(torch.arange(T, device=self.device)) # (T,C)
         x = tok_emb + pos_emb # (B,T,C))) # (T,C)
         # x = self.sa(x)
@@ -118,7 +119,9 @@ class VisionGPTModel(nn.Module):
             B, T, C = logits.shape  #4,256, 29
             logits = logits.view(B*T, C)
             targets = targets.view(B*T)
-            loss = F.cross_entropy(logits, targets)
+            loss =None
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            # loss = F.cross_entropy(logits, targets)
             # print("...loss.......")
             # print(loss)
             
